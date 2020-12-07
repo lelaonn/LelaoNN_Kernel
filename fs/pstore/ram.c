@@ -35,6 +35,7 @@
 #include <linux/pstore_ram.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/memblock.h>
 
 #define RAMOOPS_KERNMSG_HDR "===="
 #define MIN_MEM_SIZE 4096UL
@@ -818,14 +819,23 @@ static int ramoops_probe(struct platform_device *pdev)
 
 	cxt->pstore.data = cxt;
 	/*
-	 * Prepare frontend flags based on which areas are initialized.
-	 * For ramoops_init_przs() cases, the "max count" variable tells
-	 * if there are regions present. For ramoops_init_prz() cases,
-	 * the single region size is how to check.
+	 * Console can handle any buffer size, so prefer LOG_LINE_MAX. If we
+	 * have to handle dumps, we must have at least record_size buffer. And
+	 * for ftrace, bufsize is irrelevant (if bufsize is 0, buf will be
+	 * ZERO_SIZE_PTR).
 	 */
-	cxt->pstore.flags = 0;
-	if (cxt->max_dump_cnt)
-		cxt->pstore.flags |= PSTORE_FLAGS_DMESG;
+	if (cxt->console_size)
+		cxt->pstore.bufsize = 1024; /* LOG_LINE_MAX */
+	cxt->pstore.bufsize = max(cxt->record_size, cxt->pstore.bufsize);
+	cxt->pstore.buf = kmalloc(cxt->pstore.bufsize, GFP_KERNEL);
+	if (!cxt->pstore.buf) {
+		pr_err("cannot allocate pstore buffer\n");
+		err = -ENOMEM;
+		goto fail_clear;
+	}
+	spin_lock_init(&cxt->pstore.buf_lock);
+
+	cxt->pstore.flags = PSTORE_FLAGS_DMESG;
 	if (cxt->console_size)
 		cxt->pstore.flags |= PSTORE_FLAGS_CONSOLE;
 	if (cxt->max_ftrace_cnt)
@@ -952,6 +962,49 @@ static void ramoops_register_dummy(void)
 			PTR_ERR(dummy));
 	}
 }
+
+static struct ramoops_platform_data ramoops_data;
+
+static struct platform_device ramoops_dev  = {
+	.name = "ramoops",
+	.dev = {
+		.platform_data = &ramoops_data,
+	},
+};
+
+static int __init ramoops_memreserve(char *p)
+{
+	unsigned long size;
+
+	if (!p)
+		return 1;
+
+	size = memparse(p, &p) & PAGE_MASK;
+	ramoops_data.mem_size = size;
+	ramoops_data.mem_address = 0xB0000000;
+	ramoops_data.console_size = size / 2;
+	ramoops_data.pmsg_size = size / 2;
+	ramoops_data.dump_oops = 1;
+
+	pr_info("msm_reserve_ramoops_memory addr=%llx,size=%lx\n",
+		ramoops_data.mem_address, ramoops_data.mem_size);
+	pr_info("msm_reserve_ramoops_memory record_size=%lx,ftrace_size=%lx\n",
+		ramoops_data.record_size, ramoops_data.ftrace_size);
+
+	memblock_reserve(ramoops_data.mem_address, ramoops_data.mem_size);
+
+	return 0;
+}
+early_param("ramoops_memreserve", ramoops_memreserve);
+
+static int __init msm_register_ramoops_device(void)
+{
+	pr_info("msm_register_ramoops_device\n");
+	if (platform_device_register(&ramoops_dev))
+		pr_info("Unable to register ramoops platform device\n");
+	return 0;
+}
+core_initcall(msm_register_ramoops_device);
 
 static int __init ramoops_init(void)
 {
