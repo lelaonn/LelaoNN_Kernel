@@ -190,10 +190,6 @@ static int cam_vfe_rdi_process_cmd(struct cam_isp_resource_node *rsrc_node,
 		rc = cam_vfe_rdi_get_reg_update(rsrc_node, cmd_args,
 			arg_size);
 		break;
-	case CAM_ISP_HW_CMD_GET_RDI_IRQ_MASK:
-		cam_vfe_rdi_get_irq(rsrc_node, cmd_args,
-			arg_size);
-		break;
 	default:
 		CAM_ERR(CAM_ISP,
 			"unsupported RDI process command:%d", cmd_type);

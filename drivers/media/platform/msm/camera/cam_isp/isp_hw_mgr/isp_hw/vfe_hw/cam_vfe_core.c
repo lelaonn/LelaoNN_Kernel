@@ -618,17 +618,6 @@ int cam_vfe_start(void *hw_priv, void *start_args, uint32_t arg_size)
 			if (isp_res->irq_handle < 1)
 				rc = -ENOMEM;
 		} else if (isp_res->rdi_only_ctx) {
-
-			get_irq_mask.cmd_type = CAM_ISP_HW_CMD_GET_REG_UPDATE;
-			get_irq_mask.res =
-				(struct cam_isp_resource_node *)isp_res;
-			get_irq_mask.data = (void *)rdi_irq_mask;
-
-			cam_vfe_process_cmd(hw_priv,
-				CAM_ISP_HW_CMD_GET_RDI_IRQ_MASK,
-				&get_irq_mask,
-				sizeof(struct cam_isp_hw_get_cmd_update));
-
 			isp_res->irq_handle =
 				cam_irq_controller_subscribe_irq(
 					core_info->vfe_irq_controller,
@@ -779,7 +768,6 @@ int cam_vfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 	case CAM_ISP_HW_CMD_STRIPE_UPDATE:
 	case CAM_ISP_HW_CMD_STOP_BUS_ERR_IRQ:
 	case CAM_ISP_HW_CMD_UBWC_UPDATE:
-	case CAM_ISP_HW_CMD_SET_STATS_DMI_DUMP:
 		rc = core_info->vfe_bus->hw_ops.process_cmd(
 			core_info->vfe_bus->bus_priv, cmd_type, cmd_args,
 			arg_size);

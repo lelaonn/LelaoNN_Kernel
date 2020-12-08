@@ -117,7 +117,6 @@ struct cam_isp_ctx_irq_ops {
  * @bubble_report:         Flag to track if bubble report is active on
  *                         current request
  * @hw_update_data:        HW update data for this request
- * @event_timestamp:       Timestamp for different stage of request
  * @bubble_detected:       Flag to indicate if bubble detected
  * @reapply:               True if reapplying after bubble
  *
@@ -135,8 +134,6 @@ struct cam_isp_ctx_req {
 	uint32_t                              num_acked;
 	int32_t                               bubble_report;
 	struct cam_isp_prepare_hw_update_data hw_update_data;
-	struct timeval                        event_timestamp
-	    [CAM_ISP_CTX_EVENT_MAX];
 	bool                                  bubble_detected;
 	bool                                  reapply;
 };

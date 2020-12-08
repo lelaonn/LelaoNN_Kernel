@@ -3548,10 +3548,7 @@ static irqreturn_t fg_delta_msoc_irq_handler(int irq, void *data)
 		pr_err("Failed to read battery temp rc: %d\n", rc);
 	} else {
 		if (chip->cl->active) {
-			batt_soc_cp = div64_u64(
-					(u64)(u32)batt_soc * CENTI_FULL_SOC,
-					BATT_SOC_32BIT);
-			cap_learning_update(chip->cl, batt_temp, batt_soc_cp,
+			cap_learning_update(chip->cl, batt_temp, batt_soc,
 				fg->charge_status, fg->charge_done,
 				input_present, is_qnovo_en(fg));
 		}
@@ -4040,9 +4037,7 @@ static void status_change_work(struct work_struct *work)
 		fg->charge_status, fg->charge_done,
 		(input_present & (!input_suspend)));
 
-	batt_soc_cp = div64_u64((u64)(u32)batt_soc * CENTI_FULL_SOC,
-				BATT_SOC_32BIT);
-	cap_learning_update(chip->cl, batt_temp, batt_soc_cp,
+	cap_learning_update(chip->cl, batt_temp, batt_soc,
 			fg->charge_status, fg->charge_done, input_present,
 			qnovo_en);
 

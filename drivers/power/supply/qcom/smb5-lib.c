@@ -805,6 +805,38 @@ static int smblib_usb_pd_adapter_allowance_override(struct smb_charger *chg,
 	return rc;
 }
 
+static int smblib_set_adapter_allowance(struct smb_charger *chg,
+					u8 allowed_voltage)
+{
+	int rc = 0;
+
+	/* PMI632 only support max. 9V */
+	if (chg->smb_version == PMI632_SUBTYPE) {
+		switch (allowed_voltage) {
+		case USBIN_ADAPTER_ALLOW_12V:
+		case USBIN_ADAPTER_ALLOW_9V_TO_12V:
+			allowed_voltage = USBIN_ADAPTER_ALLOW_9V;
+			break;
+		case USBIN_ADAPTER_ALLOW_5V_OR_12V:
+		case USBIN_ADAPTER_ALLOW_5V_OR_9V_TO_12V:
+			allowed_voltage = USBIN_ADAPTER_ALLOW_5V_OR_9V;
+			break;
+		case USBIN_ADAPTER_ALLOW_5V_TO_12V:
+			allowed_voltage = USBIN_ADAPTER_ALLOW_5V_TO_9V;
+			break;
+		}
+	}
+
+	rc = smblib_write(chg, USBIN_ADAPTER_ALLOW_CFG_REG, allowed_voltage);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't write 0x%02x to USBIN_ADAPTER_ALLOW_CFG rc=%d\n",
+			allowed_voltage, rc);
+		return rc;
+	}
+
+	return rc;
+}
+
 #define MICRO_5V	5000000
 #define MICRO_9V	9000000
 #define MICRO_12V	12000000
@@ -3915,9 +3947,6 @@ int smblib_get_prop_dc_voltage_now(struct smb_charger *chg,
 	if (rc < 0)
 		dev_err(chg->dev, "Couldn't get POWER_SUPPLY_PROP_INPUT_VOLTAGE_REGULATION, rc=%d\n",
 				rc);
-		return rc;
-	}
-
 	return rc;
 }
 
@@ -3978,18 +4007,6 @@ int smblib_set_prop_voltage_wls_output(struct smb_charger *chg,
 				rc);
 
 	smblib_dbg(chg, PR_WLS, "%d\n", val->intval);
-
-	/*
-	 * When WLS VOUT goes down, the power-constrained adaptor may be able
-	 * to supply more current, so allow it to do so.
-	 */
-	if ((val->intval > 0) && (val->intval < chg->last_wls_vout)) {
-		/* Rerun AICL once after 10 s */
-		alarm_start_relative(&chg->dcin_aicl_alarm,
-				ms_to_ktime(DCIN_AICL_RERUN_DELAY_MS));
-	}
-
-	chg->last_wls_vout = val->intval;
 
 	return rc;
 }
@@ -5735,33 +5752,6 @@ int smblib_get_charge_current(struct smb_charger *chg,
 	return 0;
 }
 
-#define IADP_OVERHEAT_UA	500000
-int smblib_set_prop_thermal_overheat(struct smb_charger *chg,
-						int therm_overheat)
-{
-	int icl_ua = 0;
-
-	if (chg->thermal_overheat == !!therm_overheat)
-		return 0;
-
-	/* Configure ICL to 500mA in case system health is Overheat */
-	if (therm_overheat)
-		icl_ua = IADP_OVERHEAT_UA;
-
-	if (!chg->cp_disable_votable)
-		chg->cp_disable_votable = find_votable("CP_DISABLE");
-
-	if (chg->cp_disable_votable) {
-		vote(chg->cp_disable_votable, OVERHEAT_LIMIT_VOTER,
-							therm_overheat, 0);
-		vote(chg->usb_icl_votable, OVERHEAT_LIMIT_VOTER,
-							therm_overheat, icl_ua);
-	}
-
-	chg->thermal_overheat = !!therm_overheat;
-	return 0;
-}
-
 /**********************
  * INTERRUPT HANDLERS *
  **********************/
@@ -7153,11 +7143,8 @@ static void typec_src_removal(struct smb_charger *chg)
 	/* Reset CC mode votes */
 	vote(chg->fcc_main_votable, MAIN_FCC_VOTER, false, 0);
 	chg->adapter_cc_mode = 0;
-	chg->thermal_overheat = 0;
 	vote_override(chg->fcc_votable, CC_MODE_VOTER, false, 0);
 	vote_override(chg->usb_icl_votable, CC_MODE_VOTER, false, 0);
-	vote(chg->cp_disable_votable, OVERHEAT_LIMIT_VOTER, false, 0);
-	vote(chg->usb_icl_votable, OVERHEAT_LIMIT_VOTER, false, 0);
 
 	/* write back the default FLOAT charger configuration */
 	rc = smblib_masked_write(chg, USBIN_OPTIONS_2_CFG_REG,
@@ -7680,8 +7667,6 @@ irqreturn_t dc_plugin_irq_handler(int irq, void *data)
 			mutex_unlock(&chg->smb_lock);
 */
 		}
-
-		schedule_work(&chg->dcin_aicl_work);
 	} else {
 		vote(chg->awake_votable, DC_AWAKE_VOTER, false, 0);
 		vote(chg->dc_icl_votable, DCIN_ADAPTER_VOTER, true, 100000);
@@ -7716,8 +7701,6 @@ irqreturn_t dc_plugin_irq_handler(int irq, void *data)
 		}
 
 		vote(chg->dc_suspend_votable, CHG_TERMINATION_VOTER, false, 0);
-
-		chg->last_wls_vout = 0;
 	}
 
 	power_supply_changed(chg->dc_psy);
@@ -9104,15 +9087,7 @@ int smblib_init(struct smb_charger *chg)
 			return -ENODEV;
 		}
 	}
-
-	if (alarmtimer_get_rtcdev()) {
-		alarm_init(&chg->dcin_aicl_alarm, ALARM_REALTIME,
-				dcin_aicl_alarm_cb);
-	} else {
-		smblib_err(chg, "Failed to initialize dcin aicl alarm\n");
-		return -ENODEV;
-	}
-
+	
 	chg->fake_capacity = -EINVAL;
 	chg->fake_input_current_limited = -EINVAL;
 	chg->fake_batt_status = -EINVAL;
@@ -9221,7 +9196,6 @@ int smblib_deinit(struct smb_charger *chg)
 		cancel_work_sync(&chg->bms_update_work);
 		cancel_work_sync(&chg->jeita_update_work);
 		cancel_work_sync(&chg->pl_update_work);
-		cancel_work_sync(&chg->dcin_aicl_work);
 		cancel_delayed_work_sync(&chg->clear_hdc_work);
 		cancel_delayed_work_sync(&chg->icl_change_work);
 		cancel_delayed_work_sync(&chg->pl_enable_work);

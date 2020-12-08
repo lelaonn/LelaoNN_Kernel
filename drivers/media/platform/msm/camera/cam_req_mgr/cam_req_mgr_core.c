@@ -2058,7 +2058,6 @@ end:
 static int cam_req_mgr_process_trigger(void *priv, void *data)
 {
 	int                                  rc = 0;
-	int32_t                              idx = -1;
 	struct cam_req_mgr_trigger_notify   *trigger_data = NULL;
 	struct cam_req_mgr_core_link        *link = NULL;
 	struct cam_req_mgr_req_queue        *in_q = NULL;
@@ -2081,16 +2080,6 @@ static int cam_req_mgr_process_trigger(void *priv, void *data)
 	in_q = link->req.in_q;
 
 	mutex_lock(&link->req.lock);
-
-	if (trigger_data->trigger == CAM_TRIGGER_POINT_SOF) {
-		idx = __cam_req_mgr_find_slot_for_req(in_q,
-			trigger_data->req_id);
-		if (idx >= 0) {
-			if (idx == in_q->last_applied_idx)
-				in_q->last_applied_idx = -1;
-			__cam_req_mgr_reset_req_slot(link, idx);
-		}
-	}
 
 	/*
 	 * Check if current read index is in applied state, if yes make it free
@@ -2319,9 +2308,6 @@ static int cam_req_mgr_cb_notify_trigger(
 	struct  cam_req_mgr_core_link    *link = NULL;
 	struct  cam_req_mgr_trigger_notify   *notify_trigger;
 	struct  crm_task_payload         *task_data;
-	bool    send_sof = true;
-	int     i = 0;
-	int64_t sof_time_diff = 0;
 
 	if (!trigger_data) {
 		CAM_ERR(CAM_CRM, "sof_data is NULL");
@@ -2336,44 +2322,6 @@ static int cam_req_mgr_cb_notify_trigger(
 		rc = -EINVAL;
 		goto end;
 	}
-
-	for (i = 0; i < link->num_sof_src; i++) {
-		if (link->dev_sof_evt[i].dev_hdl == trigger_data->dev_hdl) {
-			if (link->dev_sof_evt[i].sof_done == false) {
-				link->dev_sof_evt[i].sof_done = true;
-				link->dev_sof_evt[i].frame_id =
-						trigger_data->frame_id;
-				link->dev_sof_evt[i].timestamp =
-					trigger_data->sof_timestamp_val;
-			} else
-				CAM_INFO(CAM_CRM, "Received Spurious SOF");
-		} else if (link->dev_sof_evt[i].sof_done == false) {
-			send_sof = false;
-		}
-	}
-
-	if (!send_sof)
-		return 0;
-	if (link->num_sof_src > 1) {
-		for (i = 0; i < (link->num_sof_src - 1); i++) {
-			if (link->dev_sof_evt[i].timestamp >=
-				link->dev_sof_evt[i+1].timestamp) {
-				sof_time_diff = link->dev_sof_evt[i].timestamp -
-					link->dev_sof_evt[i+1].timestamp;
-			} else {
-				sof_time_diff =
-					link->dev_sof_evt[i+1].timestamp -
-					link->dev_sof_evt[i].timestamp;
-			}
-			if ((link->dev_sof_evt[i].frame_id !=
-				link->dev_sof_evt[i+1].frame_id) ||
-				sof_time_diff > TIMESTAMP_DIFF_THRESHOLD)
-				return 0;
-		}
-	}
-
-	for (i = 0; i < link->num_sof_src; i++)
-		link->dev_sof_evt[i].sof_done = false;
 
 	spin_lock_bh(&link->link_state_spin_lock);
 	if (link->state < CAM_CRM_LINK_STATE_READY) {

@@ -3530,7 +3530,6 @@ static int cam_vfe_bus_process_cmd(
 {
 	int rc = -EINVAL;
 	struct cam_vfe_bus_ver2_priv		 *bus_priv;
-	struct cam_isp_hw_get_cmd_update         *cmd_update;
 
 	if (!priv || !cmd_args) {
 		CAM_ERR_RATE_LIMIT(CAM_ISP, "Invalid input arguments");
@@ -3567,12 +3566,6 @@ static int cam_vfe_bus_process_cmd(
 		break;
 	case CAM_ISP_HW_CMD_UBWC_UPDATE:
 		rc = cam_vfe_bus_update_ubwc_config(cmd_args);
-		break;
-	case CAM_ISP_HW_CMD_SET_STATS_DMI_DUMP:
-		bus_priv = (struct cam_vfe_bus_ver2_priv *) priv;
-		cmd_update = (struct cam_isp_hw_get_cmd_update *) cmd_args;
-		bus_priv->common_data.enable_dmi_dump =
-			*((uint32_t *)cmd_update->data);
 		break;
 	default:
 		CAM_ERR_RATE_LIMIT(CAM_ISP, "Invalid camif process command:%d",
