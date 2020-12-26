@@ -47,6 +47,11 @@ static uint32_t camif_irq_err_reg_mask[CAM_IFE_IRQ_REGISTERS_MAX] = {
 	0xEFFF7EBC,
 };
 
+static uint32_t rdi_irq_reg_mask[CAM_IFE_IRQ_REGISTERS_MAX] = {
+	0x780001e0,
+	0x00000000,
+};
+
 static uint32_t top_reset_irq_reg_mask[CAM_IFE_IRQ_REGISTERS_MAX] = {
 	0x80000000,
 	0x00000000,
@@ -575,9 +580,7 @@ int cam_vfe_start(void *hw_priv, void *start_args, uint32_t arg_size)
 	struct cam_vfe_hw_core_info       *core_info = NULL;
 	struct cam_hw_info                *vfe_hw  = hw_priv;
 	struct cam_isp_resource_node      *isp_res;
-	struct cam_isp_hw_get_cmd_update   get_irq_mask;
 	int rc = 0;
-	uint32_t rdi_irq_mask[CAM_IFE_IRQ_REGISTERS_MAX] = {0};
 
 	if (!hw_priv || !start_args ||
 		(arg_size != sizeof(struct cam_isp_resource_node))) {
@@ -622,7 +625,7 @@ int cam_vfe_start(void *hw_priv, void *start_args, uint32_t arg_size)
 				cam_irq_controller_subscribe_irq(
 					core_info->vfe_irq_controller,
 					CAM_IRQ_PRIORITY_1,
-					rdi_irq_mask,
+					rdi_irq_reg_mask,
 					&core_info->irq_payload,
 					cam_vfe_irq_top_half,
 					cam_ife_mgr_do_tasklet,

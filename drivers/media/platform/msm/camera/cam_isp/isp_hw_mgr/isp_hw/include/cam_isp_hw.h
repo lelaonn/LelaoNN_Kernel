@@ -248,5 +248,4 @@ struct cam_isp_hw_dual_isp_update_args {
 	struct cam_isp_resource_node    *res;
 	struct cam_isp_dual_config      *dual_cfg;
 };
-
 #endif /* _CAM_ISP_HW_H_ */

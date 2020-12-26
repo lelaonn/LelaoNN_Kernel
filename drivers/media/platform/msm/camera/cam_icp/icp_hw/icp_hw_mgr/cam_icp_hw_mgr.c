@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -3350,8 +3350,7 @@ static int cam_icp_mgr_config_hw(void *hw_mgr_priv, void *config_hw_args)
 	idx = cam_icp_clk_idx_from_req_id(ctx_data, req_id);
 	cam_icp_mgr_ipe_bps_clk_update(hw_mgr, ctx_data, idx);
 	ctx_data->hfi_frame_process.fw_process_flag[idx] = true;
-	cam_common_util_get_curr_timestamp(
-		&ctx_data->hfi_frame_process.submit_timestamp[idx]);
+
 	CAM_DBG(CAM_ICP, "req_id %llu, io config %llu", req_id,
 		frame_info->io_config);
 
@@ -5140,7 +5139,7 @@ cmd_work_failed:
 }
 
 static int cam_icp_util_dump_frame_data(struct cam_packet *packet,
-	struct cam_icp_hw_mgr  *hw_mgr, void *ctx)
+	struct cam_icp_hw_mgr  *hw_mgr, uint32_t ctx_id)
 {
 	int num_cmd_buf = 0, i = 0, rc = 0;
 	size_t len;
@@ -5148,22 +5147,11 @@ static int cam_icp_util_dump_frame_data(struct cam_packet *packet,
 	uintptr_t cpu_addr = 0;
 	struct ipe_frame_process_data *ipe_frame_process_data = NULL;
 	struct bps_frame_process_data *bps_frame_process_data = NULL;
-	struct cam_icp_hw_ctx_data *ctx_data = NULL;
+	struct cam_icp_hw_ctx_data *ctx_data;
 
 	cmd_desc = (struct cam_cmd_buf_desc *)
 		((uint32_t *) &packet->payload + packet->cmd_buf_offset/4);
-
-	for (i = 0; i < CAM_ICP_CTX_MAX; i++) {
-		if (hw_mgr->ctx_data[i].context_priv == ctx) {
-			ctx_data = &hw_mgr->ctx_data[i];
-			break;
-		}
-	}
-
-	if (!ctx_data) {
-		CAM_ERR(CAM_ICP, "ctx_data is NULL");
-		return -EINVAL;
-	}
+	ctx_data = &hw_mgr->ctx_data[ctx_id];
 
 	for (i = 0; i < packet->num_cmd_buf; i++, num_cmd_buf++) {
 		if (cmd_desc[i].type == CAM_CMD_BUF_FW) {
@@ -5283,7 +5271,7 @@ static int cam_icp_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 		cam_icp_util_dump_frame_data(
 			hw_cmd_args->u.pf_args.pf_data.packet,
 			hw_mgr,
-			hw_cmd_args->u.pf_args.pf_data.ctx);
+			hw_cmd_args->u.pf_args.pf_data.ctx_id);
 
 		break;
 	default:

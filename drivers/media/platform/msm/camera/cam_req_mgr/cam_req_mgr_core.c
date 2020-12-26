@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -927,7 +927,6 @@ static int __cam_req_mgr_check_sync_req_is_ready(
 		CAM_DBG(CAM_CRM, "Req: %lld not found on link: %x [other link]",
 			req_id, sync_link->link_hdl);
 		sync_ready = false;
-		return -EAGAIN;
 	}
 
 	sync_rd_idx = sync_link->req.in_q->rd_idx;
@@ -2028,12 +2027,6 @@ int cam_req_mgr_process_error(void *priv, void *data)
 			__cam_req_mgr_tbl_set_all_skip_cnt(&link->req.l_tbl);
 			in_q->rd_idx = idx;
 			in_q->slot[idx].status = CRM_SLOT_STATUS_REQ_ADDED;
-			if (link->sync_link) {
-				in_q->slot[idx].sync_mode = 0;
-				__cam_req_mgr_inc_idx(&idx, 1,
-					link->req.l_tbl->num_slots);
-				in_q->slot[idx].sync_mode = 0;
-			}
 			spin_lock_bh(&link->link_state_spin_lock);
 			link->state = CAM_CRM_LINK_STATE_ERR;
 			spin_unlock_bh(&link->link_state_spin_lock);
@@ -2080,7 +2073,6 @@ static int cam_req_mgr_process_trigger(void *priv, void *data)
 	in_q = link->req.in_q;
 
 	mutex_lock(&link->req.lock);
-
 	/*
 	 * Check if current read index is in applied state, if yes make it free
 	 *    and increment read index to next slot.
@@ -2304,10 +2296,10 @@ static int cam_req_mgr_cb_notify_trigger(
 	struct cam_req_mgr_trigger_notify *trigger_data)
 {
 	int                              rc = 0;
-	struct  crm_workq_task           *task = NULL;
-	struct  cam_req_mgr_core_link    *link = NULL;
-	struct  cam_req_mgr_trigger_notify   *notify_trigger;
-	struct  crm_task_payload         *task_data;
+	struct crm_workq_task           *task = NULL;
+	struct cam_req_mgr_core_link    *link = NULL;
+	struct cam_req_mgr_trigger_notify   *notify_trigger;
+	struct crm_task_payload         *task_data;
 
 	if (!trigger_data) {
 		CAM_ERR(CAM_CRM, "sof_data is NULL");
@@ -2347,7 +2339,6 @@ static int cam_req_mgr_cb_notify_trigger(
 	notify_trigger->link_hdl = trigger_data->link_hdl;
 	notify_trigger->dev_hdl = trigger_data->dev_hdl;
 	notify_trigger->trigger = trigger_data->trigger;
-	
 	task->process_cb = &cam_req_mgr_process_trigger;
 	rc = cam_req_mgr_workq_enqueue_task(task, link, CRM_TASK_PRIORITY_0);
 
@@ -2469,12 +2460,6 @@ static int __cam_req_mgr_setup_link_info(struct cam_req_mgr_core_link *link,
 				max_delay = dev->dev_info.p_delay;
 
 			subscribe_event |= (uint32_t)dev->dev_info.trigger;
-		}
-		if (dev->dev_info.dev_id == CAM_REQ_MGR_DEVICE_IFE) {
-			link->dev_sof_evt[link->num_sof_src].dev_hdl =
-				dev->dev_hdl;
-			link->dev_sof_evt[link->num_sof_src].sof_done = false;
-			link->num_sof_src++;
 		}
 	}
 
@@ -3285,73 +3270,9 @@ end:
 }
 
 
-int cam_req_mgr_dump_request(struct cam_dump_req_cmd *dump_req)
-{
-	int                               rc = 0;
-	struct cam_req_mgr_core_link     *link = NULL;
-	struct cam_req_mgr_core_session  *session = NULL;
-	struct cam_req_mgr_dump_info     info;
-	struct cam_req_mgr_connected_device *device = NULL;
-	int i;
-
-	if (!dump_req) {
-		CAM_ERR(CAM_CRM, "dump req is NULL");
-		rc = -EFAULT;
-		goto end;
-	}
-
-	mutex_lock(&g_crm_core_dev->crm_lock);
-	/* session hdl's priv data is cam session struct */
-	session = (struct cam_req_mgr_core_session *)
-		cam_get_device_priv(dump_req->session_handle);
-	if (!session) {
-		CAM_ERR(CAM_CRM, "Invalid session %x",
-			dump_req->session_handle);
-		rc = -EINVAL;
-		goto end;
-	}
-	if (session->num_links <= 0) {
-		CAM_WARN(CAM_CRM, "No active links in session %x",
-		dump_req->session_handle);
-		goto end;
-	}
-
-	link = (struct cam_req_mgr_core_link *)
-		cam_get_device_priv(dump_req->link_hdl);
-	if (!link) {
-		CAM_DBG(CAM_CRM, "link ptr NULL %x", dump_req->link_hdl);
-		rc = -EINVAL;
-		goto end;
-	}
-	info.offset = dump_req->offset;
-	for (i = 0; i < link->num_devs; i++) {
-		device = &link->l_dev[i];
-		info.link_hdl = dump_req->link_hdl;
-		info.dev_hdl = device->dev_hdl;
-		info.req_id = dump_req->issue_req_id;
-		info.buf_handle = dump_req->buf_handle;
-		if (device->ops && device->ops->dump_req) {
-			rc = device->ops->dump_req(&info);
-			if (rc) {
-				CAM_ERR(CAM_REQ, "Fail dump req %lld dev %d",
-				    info.req_id,
-				    device->dev_hdl);
-			}
-		}
-	}
-	dump_req->offset = info.offset;
-	CAM_INFO(CAM_REQ, "req %lld, offset %u",
-		dump_req->issue_req_id, dump_req->offset);
-end:
-	mutex_unlock(&g_crm_core_dev->crm_lock);
-	return 0;
-
-}
-
 int cam_req_mgr_core_device_init(void)
 {
 	int i;
-
 	CAM_DBG(CAM_CRM, "Enter g_crm_core_dev %pK", g_crm_core_dev);
 
 	if (g_crm_core_dev) {

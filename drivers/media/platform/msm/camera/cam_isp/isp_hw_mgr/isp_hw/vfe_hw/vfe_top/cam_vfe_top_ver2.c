@@ -29,7 +29,6 @@ struct cam_vfe_top_ver2_common_data {
 	struct cam_hw_soc_info                     *soc_info;
 	struct cam_hw_intf                         *hw_intf;
 	struct cam_vfe_top_ver2_reg_offset_common  *common_reg;
-	struct cam_vfe_top_dump_data               *dump_data;
 };
 
 struct cam_vfe_top_ver2_priv {
@@ -857,7 +856,6 @@ int cam_vfe_top_ver2_init(
 	top_priv->common_data.soc_info     = soc_info;
 	top_priv->common_data.hw_intf      = hw_intf;
 	top_priv->common_data.common_reg   = ver2_hw_info->common_reg;
-	top_priv->common_data.dump_data    = &ver2_hw_info->dump_data;
 
 	return rc;
 

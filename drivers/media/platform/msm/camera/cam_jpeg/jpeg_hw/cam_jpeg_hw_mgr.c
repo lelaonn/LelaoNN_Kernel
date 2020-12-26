@@ -493,7 +493,7 @@ static int cam_jpeg_mgr_process_cmd(void *priv, void *data)
 			rc);
 		goto rel_cpu_buf;
 	}
-	cam_common_util_get_curr_timestamp(&p_cfg_req->submit_timestamp);
+
 	if (cam_mem_put_cpu_buf(
 		config_args->hw_update_entries[CAM_JPEG_CHBASE].handle))
 		CAM_WARN(CAM_JPEG, "unable to put info for cmd buf: 0x%x",

@@ -910,7 +910,6 @@ static int cam_fd_mgr_util_submit_frame(void *priv, void *data)
 	hw_device->req_id = frame_req->request_id;
 	mutex_unlock(&hw_device->lock);
 
-	cam_common_util_get_curr_timestamp(&frame_req->submit_timestamp);
 	rc = cam_fd_mgr_util_put_frame_req(
 		&hw_mgr->frame_processing_list, &frame_req);
 	if (rc) {
