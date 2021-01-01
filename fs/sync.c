@@ -106,18 +106,9 @@ static void fdatawait_one_bdev(struct block_device *bdev, void *arg)
  */
 void sync_filesystems(int nowait)
 {
-	/*
-	 * Sync twice to reduce the possibility we skipped some inodes / pages
-	 * because they were temporarily locked
-	 */
-
-	iterate_supers(sync_inodes_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &nowait);
-	iterate_bdevs(fdatawrite_one_bdev, NULL);
-	iterate_bdevs(fdatawait_one_bdev, NULL);
-
-	iterate_supers(sync_inodes_one_sb, &nowait);
-	iterate_supers(sync_fs_one_sb, &nowait);
+	iterate_supers(sync_inodes_one_sb, NULL);
+	iterate_supers(sync_fs_one_sb, &wait);
+	iterate_supers(sync_fs_one_sb, &wait);
 	iterate_bdevs(fdatawrite_one_bdev, NULL);
 	iterate_bdevs(fdatawait_one_bdev, NULL);
 }
