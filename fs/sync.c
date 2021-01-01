@@ -104,7 +104,7 @@ static void fdatawait_one_bdev(struct block_device *bdev, void *arg)
  * Sync all the data for all the filesystems (called by sys_sync() and
  * emergency sync)
  */
-void sync_filesystems(int nowait)
+void sync_filesystems(int wait)
 {
 	iterate_supers(sync_inodes_one_sb, NULL);
 	iterate_supers(sync_fs_one_sb, &wait);
