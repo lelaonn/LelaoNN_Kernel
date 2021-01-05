@@ -259,13 +259,6 @@ enum {
 #define SINGLE_DECREMENT_BIT			BIT(1)
 #define SINGLE_INCREMENT_BIT			BIT(0)
 
-#define USBIN_ADAPTER_ALLOW_OVERRIDE_REG	(USBIN_BASE + 0x44)
-#define CONTINUOUS				BIT(3)
-#define FORCE_12V				BIT(2)
-#define FORCE_9V				BIT(1)
-#define FORCE_5V				BIT(0)
-#define FORCE_NULL				0
-
 #define USB_CMD_PULLDOWN_REG			(USBIN_BASE + 0x45)
 #define EN_PULLDOWN_USB_IN_BIT			BIT(0)
 
@@ -363,10 +356,7 @@ enum {
  *  TYPEC Peripheral Registers  *
  ********************************/
 #define TYPE_C_SNK_STATUS_REG			(TYPEC_BASE + 0x06)
-#define DETECTED_SRC_TYPE_MASK			GENMASK(6, 0)
-#define SNK_DAM_500MA_BIT			BIT(6)
-#define SNK_DAM_1500MA_BIT			BIT(5)
-#define SNK_DAM_3000MA_BIT			BIT(4)
+#define DETECTED_SRC_TYPE_MASK			GENMASK(3, 0)
 #define SNK_RP_STD_BIT				BIT(3)
 #define SNK_RP_1P5_BIT				BIT(2)
 #define SNK_RP_3P0_BIT				BIT(1)
